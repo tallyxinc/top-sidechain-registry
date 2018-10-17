@@ -10,6 +10,7 @@ let precision = new BigNumber('1000000000000000000');
 contract('SideChainRegistry', accounts => {
  
 	let owner = accounts[0];
+	let allowedAddress = accounts[1];
 	let sideChainRegistry;
 
 	beforeEach(async () => {
@@ -17,51 +18,40 @@ contract('SideChainRegistry', accounts => {
 	});	
 
 	describe('Check basic flow', () => {
-		it('should check that owner is change agent', async () => {
-			let changeAgentStatus = await sideChainRegistry.changeAgent.call(owner);
-			assert.equal(changeAgentStatus, true, "owner is not change agent");
+		it('should check that owner has permission to modify registry', async () => {
+			let permissionSet = await sideChainRegistry.permissions.call(owner);
+			assert.equal(new BigNumber(permissionSet).valueOf(), new BigNumber('5').valueOf(), "owner has no permissions");
 		});
 
-		it('should not update change agent cause msg.sender != owner', async () => {
-			let newChangeAgent = accounts[1];
-			let msgSender = accounts[2];
-
-			let newChangeAgentStatus = await sideChainRegistry.changeAgent.call(newChangeAgent);
-			assert.equal(newChangeAgentStatus, false, "user is change agent");
-
-			await sideChainRegistry.updateChangeAgent(newChangeAgent, true, {from: msgSender})
-				.then(Utils.receiptShouldFailed)
-				.catch(Utils.catchReceiptShouldFailed);
-
-			newChangeAgentStatus = await sideChainRegistry.changeAgent.call(newChangeAgent);
-			assert.equal(newChangeAgentStatus, false, 'user is change agent');
+		it('should check that random address has not permission to modify registry', async () => {
+			let permissionSet = await sideChainRegistry.permissions.call(allowedAddress);
+			assert.equal(new BigNumber(permissionSet).valueOf(), new BigNumber('0').valueOf(), "owner has no permissions");
 		});
 
-		it('should not update change agent cause agent == address(0)', async () => {
-			let newChangeAgent = 0x0;
+		it('should not update permission to modify registry cause msg.sender != owner', async () => {
+			await sideChainRegistry.setPermission(allowedAddress, 4, {from: accounts[2]})
+            	.then(Utils.receiptShouldFailed)
+            	.catch(Utils.catchReceiptShouldFailed);
 
-			let newChangeAgentStatus = await sideChainRegistry.changeAgent.call(newChangeAgent);
-			assert.equal(newChangeAgentStatus, false, "user is change agent");
-
-			await sideChainRegistry.updateChangeAgent(newChangeAgent, true, {from: owner})
-				.then(Utils.receiptShouldFailed)
-				.catch(Utils.catchReceiptShouldFailed);
-
-			newChangeAgentStatus = await sideChainRegistry.changeAgent.call(newChangeAgent);
-			assert.equal(newChangeAgentStatus, false, "user is change agent");
+			let permissionSet = await sideChainRegistry.permissions.call(allowedAddress);
+			assert.equal(new BigNumber(permissionSet).valueOf(), new BigNumber('0').valueOf(), "owner has no permissions");
 		});
 
-		it('should update change agent', async () => {
-			let newChangeAgent = accounts[1];
+		it('should not update permission to modify registry cause _address == address(0)', async () => {
+			await sideChainRegistry.setPermission(0x0, 4, {from: owner})
+            	.then(Utils.receiptShouldFailed)
+            	.catch(Utils.catchReceiptShouldFailed);
 
-			let newChangeAgentStatus = await sideChainRegistry.changeAgent.call(newChangeAgent);
-			assert.equal(newChangeAgentStatus, false, "user is chnage agent");
+			let permissionSet = await sideChainRegistry.permissions.call(allowedAddress);
+			assert.equal(new BigNumber(permissionSet).valueOf(), new BigNumber('0').valueOf(), "owner has no permissions");
+		});
 
-			await sideChainRegistry.updateChangeAgent(newChangeAgent, true, {from: owner})
-				.then(Utils.receiptShouldSucceed);
-
-			newChangeAgentStatus = await sideChainRegistry.changeAgent.call(newChangeAgent);
-			assert.equal(newChangeAgentStatus, true, "user is not change agent");
+		it('should update permission to modify registry', async () => {
+			await sideChainRegistry.setPermission(allowedAddress, 4, {from: owner})
+            	.then(Utils.receiptShouldSucceed);
+			
+			let permissionSet = await sideChainRegistry.permissions.call(allowedAddress);
+			assert.equal(new BigNumber(permissionSet).valueOf(), new BigNumber('4').valueOf(), "owner has no permissions");
 		});
 
 		it('should not add side chain cause msg.sender != change agent', async () => {
@@ -71,9 +61,6 @@ contract('SideChainRegistry', accounts => {
 			let sideChainOwner = accounts[2];
 			let sideChain = await SimpleToken.new({from: sideChainOwner});
 			let sideChainAddress = sideChain.address;
-
-			let newChangeAgentStatus = await sideChainRegistry.changeAgent.call(sideChainOwner);
-			assert.equal(newChangeAgentStatus, false, "user is change agent");
 
 			let sidechainTokiFabricStatus = await sideChainRegistry.sidechainTokiFabricStatus.call(sideChainAddress);
 			assert.equal(sidechainTokiFabricStatus, false, "sidechainTokiFabricStatus is not equal");
@@ -121,9 +108,6 @@ contract('SideChainRegistry', accounts => {
 			let sideChain = await SimpleToken.new({from: sideChainOwner});
 			let sideChainAddress = sideChain.address;
 
-			let newChangeAgentStatus = await sideChainRegistry.changeAgent.call(sideChainOwner);
-			assert.equal(newChangeAgentStatus, false, "user is change agent");
-
 			let sidechainTokiFabricStatus = await sideChainRegistry.sidechainTokiFabricStatus.call(sideChainAddress);
 			assert.equal(sidechainTokiFabricStatus, false, "sidechainTokiFabricStatus is not equal");
 
@@ -148,9 +132,6 @@ contract('SideChainRegistry', accounts => {
 			let sideChainOwner = accounts[2];
 			let sideChain = await SimpleToken.new({from: sideChainOwner});
 			let sideChainAddress = sideChain.address;
-
-			let newChangeAgentStatus = await sideChainRegistry.changeAgent.call(sideChainOwner);
-			assert.equal(newChangeAgentStatus, false, "user is change agent");
 
 			let sidechainTokiFabricStatus = await sideChainRegistry.sidechainTokiFabricStatus.call(sideChainAddress);
 			assert.equal(sidechainTokiFabricStatus, false, "sidechainTokiFabricStatus is not equal");
@@ -189,9 +170,6 @@ contract('SideChainRegistry', accounts => {
 			let sideChain = await SimpleToken.new({from: sideChainOwner});
 			let sideChainAddress = sideChain.address;
 
-			let newChangeAgentStatus = await sideChainRegistry.changeAgent.call(sideChainOwner);
-			assert.equal(newChangeAgentStatus, false, "user is change agent");
-
 			let sidechainTokiFabricStatus = await sideChainRegistry.sidechainTokiFabricStatus.call(sideChainAddress);
 			assert.equal(sidechainTokiFabricStatus, false, "sidechainTokiFabricStatus is not equal");
 
@@ -207,10 +185,10 @@ contract('SideChainRegistry', accounts => {
 			sideChainMarketplaceIds = await sideChainRegistry.sidechainMarkeplaceIds.call(sideChainAddress);
 			assert.equal(sideChainMarketplaceIds.valueOf(), new BigNumber('1').valueOf(), "sideChain marketplaceId is not equal");
 
-			let sidechainMarketPlaceId = await sideChainRegistry.getSidechainMarketplaceId(sideChainAddress);
+			let sidechainMarketPlaceId = await sideChainRegistry.sidechainMarketplaceId(sideChainAddress);
 			assert.equal(sidechainMarketPlaceId.valueOf(), marketplaceId, "marketplaceId is not equal");
 
-			sidechainMarketPlaceId = await sideChainRegistry.getSidechainMarketplaceId(accounts[4]);
+			sidechainMarketPlaceId = await sideChainRegistry.sidechainMarketplaceId(accounts[4]);
 			assert.equal(sidechainMarketPlaceId.valueOf(), 0, "marketplaceId is not equal");
 		});
 
@@ -222,9 +200,6 @@ contract('SideChainRegistry', accounts => {
 			let sideChain = await SimpleToken.new({from: sideChainOwner});
 			let sideChainAddress = sideChain.address;
 
-			let newChangeAgentStatus = await sideChainRegistry.changeAgent.call(sideChainOwner);
-			assert.equal(newChangeAgentStatus, false, "user is change agent");
-
 			let sidechainTokiFabricStatus = await sideChainRegistry.sidechainTokiFabricStatus.call(sideChainAddress);
 			assert.equal(sidechainTokiFabricStatus, false, "sidechainTokiFabricStatus is not equal");
 
@@ -240,10 +215,10 @@ contract('SideChainRegistry', accounts => {
 			sideChainMarketplaceIds = await sideChainRegistry.sidechainMarkeplaceIds.call(sideChainAddress);
 			assert.equal(sideChainMarketplaceIds.valueOf(), new BigNumber('1').valueOf(), "sideChain marketplaceId is not equal");
 
-			sidechainTokiFabricStatus = await sideChainRegistry.getSidechainFabricStatus(sideChainAddress);
+			sidechainTokiFabricStatus = await sideChainRegistry.sidechainFabricStatus(sideChainAddress);
 			assert.equal(sidechainTokiFabricStatus, true, "status is not equal");
 
-			sidechainTokiFabricStatus = await sideChainRegistry.getSidechainFabricStatus(accounts[4]);
+			sidechainTokiFabricStatus = await sideChainRegistry.sidechainFabricStatus(accounts[4]);
 			assert.equal(sidechainTokiFabricStatus, false, "status is not equal");
 		});
 
@@ -254,9 +229,6 @@ contract('SideChainRegistry', accounts => {
 			let sideChainOwner = accounts[2];
 			let sideChain = await SimpleToken.new({from: sideChainOwner});
 			let sideChainAddress = sideChain.address;
-
-			let newChangeAgentStatus = await sideChainRegistry.changeAgent.call(sideChainOwner);
-			assert.equal(newChangeAgentStatus, false, "user is change agent");
 
 			let sidechainTokiFabricStatus = await sideChainRegistry.sidechainTokiFabricStatus.call(sideChainAddress);
 			assert.equal(sidechainTokiFabricStatus, false, "sidechainTokiFabricStatus is not equal");
@@ -291,9 +263,6 @@ contract('SideChainRegistry', accounts => {
 			let sideChainOwner = accounts[2];
 			let sideChain = await SimpleToken.new({from: sideChainOwner});
 			let sideChainAddress = sideChain.address;
-
-			let newChangeAgentStatus = await sideChainRegistry.changeAgent.call(sideChainOwner);
-			assert.equal(newChangeAgentStatus, false, "user is change agent");
 
 			let sidechainTokiFabricStatus = await sideChainRegistry.sidechainTokiFabricStatus.call(sideChainAddress);
 			assert.equal(sidechainTokiFabricStatus, false, "sidechainTokiFabricStatus is not equal");
